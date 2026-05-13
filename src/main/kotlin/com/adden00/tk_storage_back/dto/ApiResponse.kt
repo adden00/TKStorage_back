@@ -1,4 +1,4 @@
-package com.adden00.TKStorageBack.dto
+package com.adden00.tk_storage_back.dto
 
 data class ItemResponse(val success: Boolean, val equipItem: EquipItemDto? = null)
 

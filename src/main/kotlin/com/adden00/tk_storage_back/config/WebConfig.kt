@@ -1,4 +1,4 @@
-package com.adden00.TKStorageBack.config
+package com.adden00.tk_storage_back.config
 
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.servlet.config.annotation.CorsRegistry

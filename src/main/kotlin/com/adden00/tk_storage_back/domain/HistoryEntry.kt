@@ -1,4 +1,4 @@
-package com.adden00.TKStorageBack.domain
+package com.adden00.tk_storage_back.domain
 
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.mapping.Document

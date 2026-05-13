@@ -1,5 +1,6 @@
-package com.adden00.TKStorageBack.domain
+package com.adden00.tk_storage_back.domain
 
+import com.adden00.tk_storage_back.dto.EquipItemDto
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
@@ -18,4 +19,18 @@ data class EquipItem(
     val event: String = "",
     val info: String = "",
     val date: String = ""
+)
+
+fun EquipItemDto.toItem() = EquipItem(
+    id = id,
+    category = category,
+    brand = brand,
+    name = name,
+    color = color,
+    weigh = weigh,
+    quality = quality,
+    location = location,
+    event = event,
+    info = info,
+    date = date
 )

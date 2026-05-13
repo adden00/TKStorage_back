@@ -1,4 +1,4 @@
-package com.adden00.TKStorageBack
+package com.adden00.tk_storage_back
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication

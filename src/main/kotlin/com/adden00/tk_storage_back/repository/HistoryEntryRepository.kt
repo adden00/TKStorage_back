@@ -1,6 +1,6 @@
-package com.adden00.TKStorageBack.repository
+package com.adden00.tk_storage_back.repository
 
-import com.adden00.TKStorageBack.domain.HistoryEntry
+import com.adden00.tk_storage_back.domain.HistoryEntry
 import org.springframework.data.mongodb.repository.MongoRepository
 
 interface HistoryEntryRepository : MongoRepository<HistoryEntry, String>
