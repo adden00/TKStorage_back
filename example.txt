@@ -1,0 +1,282 @@
+const minVersionCode = 2
+
+
+function doPost(e) {
+
+  const type = e.parameter.type
+  if (e.parameter.versionCode == null) {
+    return ContentService.createTextOutput().append(JSON.stringify({ 'success': false, 'message': "Пожалуйста обновите приложение!" })).setMimeType(ContentService.MimeType.Text) //making error in appp
+  }
+  const versionCode = parseInt(e.parameter.versionCode)
+  if (versionCode < minVersionCode) {
+    return ContentService.createTextOutput().append(JSON.stringify({ 'success': false, 'message': "Пожалуйста обновите приложение!" })).setMimeType(ContentService.MimeType.JSON) // ask to update
+  }
+  if (type == 'get') {
+    return getItem(e)
+  }
+
+  if (type == 'update') {
+    return updateItem(e)
+  }
+
+  if (type == 'add') {
+    return addItem(e)
+  }
+
+  if (type == 'getFreeId') {
+    return getFreeId(e)
+  }
+
+  if (type == 'search') {
+    return search(e)
+  }
+
+}
+
+function getItem(e) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName('Снаряжение 2025 актуальное')
+  var id = e.parameter.id
+  var i = getRowNumber(id, sheet)
+  if (i == -1 || i == null) {
+    return ContentService.createTextOutput().append(JSON.stringify({ 'success': false })).setMimeType(ContentService.MimeType.JSON)
+  } else {
+    return ContentService.createTextOutput().append(JSON.stringify(
+      {
+        'success': true,
+        'equipItem': {
+          'id': sheet.getRange(i, 1).getValue().toString(),
+          'category': sheet.getRange(i, 2).getValue().toString(),
+          'brand': sheet.getRange(i, 3).getValue().toString(),
+          'name': sheet.getRange(i, 4).getValue().toString(),
+          'color': sheet.getRange(i, 5).getValue().toString(),
+          'weigh': sheet.getRange(i, 7).getValue().toString(),
+          'quality': sheet.getRange(i, 8).getValue().toString(),
+          'location': sheet.getRange(i, 9).getValue().toString(),
+          'event': sheet.getRange(i, 10).getValue().toString(),
+          'info': sheet.getRange(i, 12).getValue().toString(),
+          'date': sheet.getRange(i, 13).getValue().toString()
+        }
+      }
+    )).setMimeType(ContentService.MimeType.JSON)
+  }
+}
+
+
+function updateItem(e) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName('Снаряжение 2025 актуальное')
+  var id = e.parameter.id
+
+  // var item = JSON.parse(e.postData.contents)
+  var i = getRowNumber(id, sheet)
+  if (i == -1 || i == null) {
+    return ContentService.createTextOutput().append(JSON.stringify({ 'success': false })).setMimeType(ContentService.MimeType.JSON)
+  } else {
+
+    SpreadsheetApp.getActive().getSheetByName('история').appendRow([
+      "ОБНОВЛЕНО",
+      sumIfDifferent(sheet.getRange(i, 1).getValue(), e.parameter.itemId),
+      sumIfDifferent(sheet.getRange(i, 2).getValue(), e.parameter.category),
+      sumIfDifferent(sheet.getRange(i, 3).getValue(), e.parameter.brand),
+      sumIfDifferent(sheet.getRange(i, 4).getValue(), e.parameter.name),
+      sumIfDifferent(sheet.getRange(i, 5).getValue(), e.parameter.color),
+      sumIfDifferent(sheet.getRange(i, 7).getValue(), e.parameter.weigh),
+      sumIfDifferent(sheet.getRange(i, 8).getValue(), e.parameter.quality),
+      sumIfDifferent(sheet.getRange(i, 9).getValue(), e.parameter.location),
+      sumIfDifferent(sheet.getRange(i, 10).getValue(), e.parameter.event),
+      sumIfDifferent(sheet.getRange(i, 12).getValue(), e.parameter.info),
+      getCurrentTime(),
+      e.parameter.keyholderName
+    ])
+
+    sheet.getRange(i, 1).setValue(e.parameter.itemId)
+    sheet.getRange(i, 2).setValue(e.parameter.category)
+    sheet.getRange(i, 3).setValue(e.parameter.brand)
+    sheet.getRange(i, 4).setValue(e.parameter.name)
+    sheet.getRange(i, 5).setValue(e.parameter.color)
+    sheet.getRange(i, 7).setValue(e.parameter.weigh)
+    sheet.getRange(i, 8).setValue(e.parameter.quality)
+    sheet.getRange(i, 9).setValue(e.parameter.location)
+    sheet.getRange(i, 10).setValue(e.parameter.event)
+    sheet.getRange(i, 12).setValue(e.parameter.info)
+    sheet.getRange(i, 13).setValue(e.parameter.date)
+
+
+    return ContentService.createTextOutput().append(JSON.stringify({
+      'success': true,
+      'equipItem': {
+        'id': e.parameter.itemId,
+        'category': e.parameter.category,
+        'brand': e.parameter.brand,
+        'name': e.parameter.name,
+        'color': e.parameter.color,
+        'weigh': e.parameter.weigh,
+        'quality': e.parameter.quality,
+        'location': e.parameter.location,
+        'event': e.parameter.event,
+        'info': e.parameter.info,
+        'date': e.parameter.date,
+      }
+    })).setMimeType(ContentService.MimeType.JSON)
+  }
+}
+
+function addItem(e) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName('Снаряжение 2025 актуальное')
+  var id = e.parameter.id
+  if (id == null || id == "") {
+    return ContentService.createTextOutput().append(JSON.stringify({ 'success': false })).setMimeType(ContentService.MimeType.JSON)
+  }
+
+  var i = getRowNumber(id, sheet)
+  if (i == -1 || i == null) {
+    sheet.appendRow([
+      e.parameter.itemId,
+      e.parameter.category,
+      e.parameter.brand,
+      e.parameter.name,
+      e.parameter.color,
+      "",
+      e.parameter.weigh,
+      e.parameter.quality,
+      e.parameter.location,
+      e.parameter.event,
+      "",
+      e.parameter.info,
+      e.parameter.date,
+    ])
+    SpreadsheetApp.getActive().getSheetByName('история').appendRow([
+      "ДОБАВЛЕНО",
+      e.parameter.itemId,
+      e.parameter.category,
+      e.parameter.brand,
+      e.parameter.name,
+      e.parameter.color,
+      e.parameter.weigh,
+      e.parameter.quality,
+      e.parameter.location,
+      e.parameter.event,
+      e.parameter.info,
+      getCurrentTime(),
+      e.parameter.keyholderName
+    ])
+    return ContentService.createTextOutput().append(JSON.stringify({
+      'success': true,
+      'equipItem': {
+        'id': e.parameter.itemId,
+        'category': e.parameter.category,
+        'brand': e.parameter.brand,
+        'name': e.parameter.name,
+        'color': e.parameter.color,
+        'weigh': e.parameter.weigh,
+        'quality': e.parameter.quality,
+        'location': e.parameter.location,
+        'event': e.parameter.event,
+        'info': e.parameter.info,
+        'date': e.parameter.date,
+      }
+    })).setMimeType(ContentService.MimeType.JSON)
+  } else {
+    return ContentService.createTextOutput().append(JSON.stringify({ 'success': false })).setMimeType(ContentService.MimeType.JSON)
+  }
+}
+
+function getFreeId() {
+  const sheet = SpreadsheetApp.getActive().getSheetByName('Снаряжение 2025 актуальное')
+  var lr = sheet.getLastRow()
+  const lc = sheet.getLastColumn()
+  const range = sheet.getRange(2, 1, lr, lc)
+  range.sort(1)
+  while (sheet.getRange(lr, 1).getValue() == "" && lr > 0) {
+    lr--
+  }
+  var maxId = sheet.getRange(lr, 1).getValue()
+  var freeId = maxId + 1
+  var existNumber = getRowNumber(freeId, sheet)
+  if (existNumber == -1 || existNumber == null) {
+    return ContentService.createTextOutput().append(JSON.stringify({ 'success': true, 'id': freeId.toString() })).setMimeType(ContentService.MimeType.JSON)
+  }
+
+  // если не отсортирована, и попали в существующей, то ищем просто циклом
+  lr = sheet.getLastRow()
+  maxId = sheet.getRange(lr, 1).getValue()
+  for (var i = 2; i <= lr; i++) {
+    var rid = sheet.getRange(i, 1).getValue()
+    if (rid == '') {
+      break
+    }
+    if (Number(rid) > maxId) {
+      maxId = rid
+    }
+  }
+  if (maxId != null && maxId != "")
+    return ContentService.createTextOutput().append(JSON.stringify({ 'success': true, 'id': (maxId + 1).toString() })).setMimeType(ContentService.MimeType.JSON)
+  else {
+    return ContentService.createTextOutput().append(JSON.stringify({ 'success': false })).setMimeType(ContentService.MimeType.JSON)
+  }
+}
+
+function search(e) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName('Снаряжение 2025 актуальное')
+  const query = e.parameter.query
+  const rows = find(query, sheet)
+  const items = rows.map(i => {
+    return {
+      'id': sheet.getRange(i, 1).getValue().toString(),
+      'category': sheet.getRange(i, 2).getValue().toString(),
+      'brand': sheet.getRange(i, 3).getValue().toString(),
+      'name': sheet.getRange(i, 4).getValue().toString(),
+      'color': sheet.getRange(i, 5).getValue().toString(),
+      'weigh': sheet.getRange(i, 7).getValue().toString(),
+      'quality': sheet.getRange(i, 8).getValue().toString(),
+      'location': sheet.getRange(i, 9).getValue().toString(),
+      'event': sheet.getRange(i, 10).getValue().toString(),
+      'info': sheet.getRange(i, 12).getValue().toString(),
+      'date': sheet.getRange(i, 13).getValue().toString()
+    }
+  })
+
+  return ContentService.createTextOutput().append(JSON.stringify(
+    {
+      'success': true,
+      'items': items
+    }
+  )).setMimeType(ContentService.MimeType.JSON)
+
+}
+
+function find(name, sheet) {
+  const lr = sheet.getLastRow()
+  const range = sheet.getRange(1, 9, lr, 1)
+  const textFinder = range.createTextFinder(name)
+  const searchedItems = textFinder.findAll()
+  return searchedItems.map(item => {
+    return item.getRow()
+  })
+}
+
+function getRowNumber(id, sheet) {
+  const lr = sheet.getLastRow()
+  const range = sheet.getRange(1, 1, lr, 1)
+  const textFinder = range.createTextFinder(id).matchEntireCell(true)
+  const searchedItems = textFinder.findAll()
+  if (searchedItems.length > 1) {
+    //todo нашли коллизии
+  }
+  if (searchedItems.length == 0) {
+    return -1
+  }
+  return searchedItems[0].getRow()
+}
+
+function sumIfDifferent(s1, s2) {
+  if (s1 == s2)
+    return s1
+  else
+    return s1 + "-->\n  ->" + s2
+}
+
+function getCurrentTime() {
+  return Utilities.formatDate(new Date(), "GMT+3", "dd.MM.yyyy HH:mm")
+}
+
+
