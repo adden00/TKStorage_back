@@ -14,7 +14,7 @@ private const val MIN_VERSION_CODE = 2
 @Component
 class VersionCheckFilter(private val objectMapper: ObjectMapper) : OncePerRequestFilter() {
     override fun shouldNotFilter(request: HttpServletRequest) =
-        request.requestURI == "/health"
+        request.requestURI == "/health" || request.method == "OPTIONS"
 
     override fun doFilterInternal(
         request: HttpServletRequest,
