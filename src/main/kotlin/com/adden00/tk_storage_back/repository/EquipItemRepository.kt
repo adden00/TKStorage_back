@@ -14,6 +14,8 @@ interface EquipItemRepository : MongoRepository<EquipItem, String> {
 
     fun findByLocationContainingIgnoreCase(query: String): List<EquipItem>
 
+    fun findByNameContainingIgnoreCase(query: String): List<EquipItem>
+
     @Aggregation(pipeline = ["{ '\$group': { '_id': null, 'maxId': { '\$max': { '\$toLong': '\$id' } } } }"])
     fun findMaxNumericId(): MaxIdResult?
 }

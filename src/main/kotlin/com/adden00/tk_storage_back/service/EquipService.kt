@@ -92,8 +92,18 @@ class EquipService(
         return FreeIdResponse(success = true, id = (maxId + 1).toString())
     }
 
+    fun getAllItems(): SearchResponse {
+        val items = equipItemRepository.findAll().map { buildDto(it) }
+        return SearchResponse(success = true, items = items)
+    }
+
     fun search(query: String): SearchResponse {
         val items = equipItemRepository.findByLocationContainingIgnoreCase(query).map { buildDto(it) }
+        return SearchResponse(success = true, items = items)
+    }
+
+    fun searchByName(query: String): SearchResponse {
+        val items = equipItemRepository.findByNameContainingIgnoreCase(query).map { buildDto(it) }
         return SearchResponse(success = true, items = items)
     }
 

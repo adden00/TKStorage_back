@@ -9,6 +9,9 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/items")
 class EquipController(private val equipService: EquipService) {
 
+    @GetMapping
+    fun getAllItems() = equipService.getAllItems()
+
     @GetMapping("/{id}")
     fun getItem(@PathVariable id: String) = equipService.getItem(id)
 
@@ -23,5 +26,8 @@ class EquipController(private val equipService: EquipService) {
     fun getFreeId() = equipService.getFreeId()
 
     @GetMapping("/search")
-    fun search(@RequestParam q: String) = equipService.search(q)
+    fun search(@RequestParam query: String) = equipService.search(query)
+
+    @GetMapping("/search/by-name")
+    fun searchByName(@RequestParam query: String) = equipService.searchByName(query)
 }
