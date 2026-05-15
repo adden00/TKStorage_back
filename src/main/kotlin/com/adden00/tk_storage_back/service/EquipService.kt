@@ -107,6 +107,24 @@ class EquipService(
         return SearchResponse(success = true, items = items)
     }
 
+    fun getItemHistory(id: String): HistoryResponse {
+        val entries = historyEntryRepository.findAllByIdIs(id).map { e ->
+            e.copy(
+                id = if ("-->" in e.id) e.id else "",
+                category = if ("-->" in e.category) e.category else "",
+                brand = if ("-->" in e.brand) e.brand else "",
+                name = if ("-->" in e.name) e.name else "",
+                color = if ("-->" in e.color) e.color else "",
+                weigh = if ("-->" in e.weigh) e.weigh else "",
+                quality = if ("-->" in e.quality) e.quality else "",
+                location = if ("-->" in e.location) e.location else "",
+                event = if ("-->" in e.event) e.event else "",
+                info = if ("-->" in e.info) e.info else "",
+            )
+        }
+        return HistoryResponse(success = true, entries = entries)
+    }
+
     private fun buildDto(item: EquipItem) = EquipItemDto(
         id = item.id,
         category = item.category,
@@ -122,7 +140,7 @@ class EquipService(
     )
 
     private fun sumIfDifferent(old: String, new: String) =
-        if (old == new) old else "$old-->\n  ->$new"
+        if (old == new) old else "$old-->$new"
 
     private fun getCurrentTime(): String =
         ZonedDateTime.now(ZoneId.of("GMT+3"))
