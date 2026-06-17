@@ -3,6 +3,9 @@ package com.adden00.tk_storage_back.controller
 import com.adden00.tk_storage_back.dto.AddItemRequest
 import com.adden00.tk_storage_back.dto.UpdateItemRequest
 import com.adden00.tk_storage_back.service.EquipService
+import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
@@ -33,4 +36,23 @@ class EquipController(private val equipService: EquipService) {
 
     @GetMapping("/{id}/history")
     fun getItemHistory(@PathVariable id: String) = equipService.getItemHistory(id)
+
+    @GetMapping("/export/xls")
+    fun exportXlsx(): ResponseEntity<ByteArray> {
+        val bytes = equipService.buildItemsXlsx()
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"equip_items.xlsx\"")
+            .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+            .body(bytes)
+    }
+
+    @GetMapping("/export/csv")
+    fun exportCsv(): ResponseEntity<ByteArray> {
+        val csv = equipService.buildItemsCsv()
+        val bytes = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + csv.toByteArray(Charsets.UTF_8)
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"equip_items.csv\"")
+            .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+            .body(bytes)
+    }
 }

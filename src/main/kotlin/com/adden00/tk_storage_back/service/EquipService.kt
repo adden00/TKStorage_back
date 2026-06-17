@@ -6,7 +6,9 @@ import com.adden00.tk_storage_back.domain.toItem
 import com.adden00.tk_storage_back.dto.*
 import com.adden00.tk_storage_back.repository.EquipItemRepository
 import com.adden00.tk_storage_back.repository.HistoryEntryRepository
+import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import org.springframework.stereotype.Service
+import java.io.ByteArrayOutputStream
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -123,6 +125,45 @@ class EquipService(
             )
         }
         return HistoryResponse(success = true, entries = entries)
+    }
+
+    fun buildItemsCsv(): String {
+        val header = "id,category,brand,name,color,weigh,quality,location,event,info,date"
+        val rows = equipItemRepository.findAll().map { item ->
+            itemValues(item).joinToString(",") { csvEscape(it) }
+        }
+        return (listOf(header) + rows).joinToString("\r\n")
+    }
+
+    fun buildItemsXlsx(): ByteArray {
+        val header = listOf("id", "category", "brand", "name", "color", "weigh", "quality", "location", "event", "info", "date")
+        XSSFWorkbook().use { workbook ->
+            val sheet = workbook.createSheet("Items")
+            sheet.createRow(0).let { row ->
+                header.forEachIndexed { i, title -> row.createCell(i).setCellValue(title) }
+            }
+            equipItemRepository.findAll().forEachIndexed { rowIndex, item ->
+                val row = sheet.createRow(rowIndex + 1)
+                itemValues(item).forEachIndexed { i, value -> row.createCell(i).setCellValue(value) }
+            }
+            ByteArrayOutputStream().use { out ->
+                workbook.write(out)
+                return out.toByteArray()
+            }
+        }
+    }
+
+    private fun itemValues(item: EquipItem) = listOf(
+        item.id, item.category, item.brand, item.name, item.color,
+        item.weigh, item.quality, item.location, item.event, item.info, item.date
+    )
+
+    private fun csvEscape(value: String): String {
+        return if (value.any { it == ',' || it == '"' || it == '\n' || it == '\r' }) {
+            "\"${value.replace("\"", "\"\"")}\""
+        } else {
+            value
+        }
     }
 
     private fun buildDto(item: EquipItem) = EquipItemDto(
