@@ -15,6 +15,7 @@ import java.io.ByteArrayOutputStream
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.util.regex.Pattern
 
 @Service
 class EquipService(
@@ -40,7 +41,7 @@ class EquipService(
 
         historyEntryRepository.save(
             HistoryEntry(
-                action = "ОБНОВЛЕНО",
+                action = body.historyAction,
                 id = sumIfDifferent(item.id, body.newItem.id),
                 category = sumIfDifferent(item.category, body.newItem.category),
                 brand = sumIfDifferent(item.brand, body.newItem.brand),
@@ -111,7 +112,9 @@ class EquipService(
     }
 
     fun search(query: String): SearchResponse {
-        val items = equipItemRepository.findByLocationContainingIgnoreCase(query).map { buildDto(it) }
+        val items = equipItemRepository
+            .searchAcrossFields(Pattern.quote(query))
+            .map { buildDto(it) }
         return SearchResponse(success = true, items = items)
     }
 

@@ -5,6 +5,15 @@ import org.springframework.data.mongodb.repository.Aggregation
 import org.springframework.data.mongodb.repository.MongoRepository
 import org.springframework.data.mongodb.repository.Query
 
+private const val SEARCH_QUERY = "{ \"\$or\": [" +
+    " { \"location\": { \"\$regex\": ?0, \"\$options\": \"i\" } }," +
+    " { \"name\":     { \"\$regex\": ?0, \"\$options\": \"i\" } }," +
+    " { \"brand\":    { \"\$regex\": ?0, \"\$options\": \"i\" } }," +
+    " { \"category\": { \"\$regex\": ?0, \"\$options\": \"i\" } }," +
+    " { \"color\":    { \"\$regex\": ?0, \"\$options\": \"i\" } }," +
+    " { \"event\":    { \"\$regex\": ?0, \"\$options\": \"i\" } }" +
+    " ] }"
+
 data class MaxIdResult(val maxId: Long?)
 
 interface EquipItemRepository : MongoRepository<EquipItem, String> {
@@ -12,7 +21,8 @@ interface EquipItemRepository : MongoRepository<EquipItem, String> {
     @Query("{ 'id': ?0 }")
     fun findByAppId(id: String): EquipItem?
 
-    fun findByLocationContainingIgnoreCase(query: String): List<EquipItem>
+    @Query(SEARCH_QUERY)
+    fun searchAcrossFields(query: String): List<EquipItem>
 
     fun findByNameContainingIgnoreCase(query: String): List<EquipItem>
 
