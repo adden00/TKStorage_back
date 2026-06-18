@@ -46,6 +46,9 @@ class EquipController(private val equipService: EquipService) {
             .body(bytes)
     }
 
+    @PostMapping("/export/sheets")
+    fun exportToSheets() = equipService.exportToSheets()
+
     @GetMapping("/export/csv")
     fun exportCsv(): ResponseEntity<ByteArray> {
         val csv = equipService.buildItemsCsv()

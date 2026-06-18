@@ -7,7 +7,10 @@ import com.adden00.tk_storage_back.dto.*
 import com.adden00.tk_storage_back.repository.EquipItemRepository
 import com.adden00.tk_storage_back.repository.HistoryEntryRepository
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.http.MediaType
 import org.springframework.stereotype.Service
+import org.springframework.web.client.RestClient
 import java.io.ByteArrayOutputStream
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -16,7 +19,9 @@ import java.time.format.DateTimeFormatter
 @Service
 class EquipService(
     private val equipItemRepository: EquipItemRepository,
-    private val historyEntryRepository: HistoryEntryRepository
+    private val historyEntryRepository: HistoryEntryRepository,
+    private val appScriptRestClient: RestClient,
+    @Value("\${appscript.export.url}") private val appScriptUrl: String
 ) {
 
     fun getItem(id: String): ItemResponse {
@@ -127,9 +132,24 @@ class EquipService(
         return HistoryResponse(success = true, entries = entries)
     }
 
+    fun exportToSheets(): ExportResponse {
+        if (appScriptUrl.isBlank()) return ExportResponse(success = false, message = "Apps Script URL not configured")
+        return try {
+            appScriptRestClient.post()
+                .uri(appScriptUrl)
+                .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+                .body(buildItemsCsv())
+                .retrieve()
+                .toBodilessEntity()
+            ExportResponse(success = true)
+        } catch (e: Exception) {
+            ExportResponse(success = false, message = e.message)
+        }
+    }
+
     fun buildItemsCsv(): String {
         val header = "id,category,brand,name,color,weigh,quality,location,event,info,date"
-        val rows = equipItemRepository.findAll().map { item ->
+        val rows = equipItemRepository.findAll().sortedBy { it.id.toIntOrNull() ?: Int.MAX_VALUE }.map { item ->
             itemValues(item).joinToString(",") { csvEscape(it) }
         }
         return (listOf(header) + rows).joinToString("\r\n")
