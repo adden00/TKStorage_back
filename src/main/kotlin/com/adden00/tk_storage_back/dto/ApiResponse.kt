@@ -13,3 +13,5 @@ data class HistoryResponse(val success: Boolean, val entries: List<HistoryEntry>
 data class ErrorResponse(val success: Boolean = false, val message: String)
 
 data class ExportResponse(val success: Boolean, val message: String? = null)
+
+data class ImportResponse(val success: Boolean, val importedCount: Int? = null, val message: String? = null)

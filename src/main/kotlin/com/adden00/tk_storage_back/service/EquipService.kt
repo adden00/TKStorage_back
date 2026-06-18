@@ -21,8 +21,14 @@ class EquipService(
     private val equipItemRepository: EquipItemRepository,
     private val historyEntryRepository: HistoryEntryRepository,
     private val appScriptRestClient: RestClient,
-    @Value("\${appscript.export.url}") private val appScriptUrl: String
+    @Value("\${appscript.export.url}") private val appScriptUrl: String,
+    @Value("\${appscript.import.url}") private val appScriptImportUrl: String
 ) {
+
+    companion object {
+        private const val HEADER = "id,category,brand,name,color,weigh,quality,location,event,info,date"
+        private const val COLUMN_COUNT = 11
+    }
 
     fun getItem(id: String): ItemResponse {
         val item = equipItemRepository.findByAppId(id) ?: return ItemResponse(success = false)
@@ -138,7 +144,7 @@ class EquipService(
             appScriptRestClient.post()
                 .uri(appScriptUrl)
                 .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
-                .body(buildItemsCsv())
+                .body(buildItemsCsv(includeHeader = false))
                 .retrieve()
                 .toBodilessEntity()
             ExportResponse(success = true)
@@ -147,12 +153,40 @@ class EquipService(
         }
     }
 
-    fun buildItemsCsv(): String {
-        val header = "id,category,brand,name,color,weigh,quality,location,event,info,date"
+    fun buildItemsCsv(includeHeader: Boolean = true): String {
         val rows = equipItemRepository.findAll().sortedBy { it.id.toIntOrNull() ?: Int.MAX_VALUE }.map { item ->
             itemValues(item).joinToString(",") { csvEscape(it) }
         }
-        return (listOf(header) + rows).joinToString("\r\n")
+        return (if (includeHeader) listOf(HEADER) + rows else rows).joinToString("\r\n")
+    }
+
+    fun importFromSheets(): ImportResponse {
+        if (appScriptImportUrl.isBlank()) return ImportResponse(success = false, message = "Apps Script import URL not configured")
+        return try {
+            val csv = appScriptRestClient.get()
+                .uri(appScriptImportUrl)
+                .retrieve()
+                .body(String::class.java)
+                ?: return ImportResponse(success = false, message = "Empty response from Apps Script")
+
+            val rows = parseCsv(csv).filter { it.isNotEmpty() && it.any { c -> c.isNotBlank() } }
+            if (rows.isEmpty()) return ImportResponse(success = false, message = "CSV has no data rows")
+            if (rows.any { it.size != COLUMN_COUNT })
+                return ImportResponse(success = false, message = "Malformed CSV: wrong column count")
+
+            val items = rows.map { r ->
+                EquipItem(id = r[0], category = r[1], brand = r[2], name = r[3], color = r[4],
+                    weigh = r[5], quality = r[6], location = r[7], event = r[8], info = r[9], date = r[10])
+            }
+            val dupId = items.groupingBy { it.id }.eachCount().entries.firstOrNull { it.value > 1 }?.key
+            if (dupId != null) return ImportResponse(success = false, message = "Duplicate id in CSV: $dupId")
+
+            equipItemRepository.deleteAll()
+            equipItemRepository.saveAll(items)
+            ImportResponse(success = true, importedCount = items.size)
+        } catch (e: Exception) {
+            ImportResponse(success = false, message = e.message)
+        }
     }
 
     fun buildItemsXlsx(): ByteArray {
@@ -177,6 +211,44 @@ class EquipService(
         item.id, item.category, item.brand, item.name, item.color,
         item.weigh, item.quality, item.location, item.event, item.info, item.date
     )
+
+    // RFC4180-совместимый парсер: корректно обрабатывает поля в кавычках,
+    // включая запятые и переносы строк внутри полей, а также удвоенные кавычки.
+    private fun parseCsv(text: String): List<List<String>> {
+        val result = mutableListOf<List<String>>()
+        val row = mutableListOf<String>()
+        val field = StringBuilder()
+        // снять BOM если есть
+        val input = text.trimStart('﻿')
+        var i = 0
+        var inQuotes = false
+        while (i < input.length) {
+            val ch = input[i]
+            when {
+                inQuotes && ch == '"' && i + 1 < input.length && input[i + 1] == '"' -> {
+                    field.append('"'); i += 2
+                }
+                inQuotes && ch == '"' -> { inQuotes = false; i++ }
+                !inQuotes && ch == '"' -> { inQuotes = true; i++ }
+                !inQuotes && ch == ',' -> { row.add(field.toString()); field.clear(); i++ }
+                !inQuotes && ch == '\r' && i + 1 < input.length && input[i + 1] == '\n' -> {
+                    row.add(field.toString()); field.clear()
+                    result.add(row.toList()); row.clear(); i += 2
+                }
+                !inQuotes && (ch == '\n' || ch == '\r') -> {
+                    row.add(field.toString()); field.clear()
+                    result.add(row.toList()); row.clear(); i++
+                }
+                else -> { field.append(ch); i++ }
+            }
+        }
+        // последняя строка без финального переноса
+        if (field.isNotEmpty() || row.isNotEmpty()) {
+            row.add(field.toString())
+            result.add(row.toList())
+        }
+        return result
+    }
 
     private fun csvEscape(value: String): String {
         return if (value.any { it == ',' || it == '"' || it == '\n' || it == '\r' }) {
