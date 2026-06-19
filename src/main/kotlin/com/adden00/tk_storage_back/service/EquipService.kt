@@ -15,7 +15,6 @@ import java.io.ByteArrayOutputStream
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
-import java.util.regex.Pattern
 
 @Service
 class EquipService(
@@ -112,14 +111,9 @@ class EquipService(
     }
 
     fun search(query: String): SearchResponse {
-        val items = equipItemRepository
-            .searchAcrossFields(Pattern.quote(query))
-            .map { buildDto(it) }
-        return SearchResponse(success = true, items = items)
-    }
-
-    fun searchByName(query: String): SearchResponse {
-        val items = equipItemRepository.findByNameContainingIgnoreCase(query).map { buildDto(it) }
+        val words = query.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (words.isEmpty()) return SearchResponse(success = true, items = emptyList())
+        val items = equipItemRepository.searchAcrossFields(words).map { buildDto(it) }
         return SearchResponse(success = true, items = items)
     }
 

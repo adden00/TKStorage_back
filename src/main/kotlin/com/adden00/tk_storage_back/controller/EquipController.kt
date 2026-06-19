@@ -31,9 +31,6 @@ class EquipController(private val equipService: EquipService) {
     @GetMapping("/search")
     fun search(@RequestParam query: String) = equipService.search(query)
 
-    @GetMapping("/search/by-name")
-    fun searchByName(@RequestParam query: String) = equipService.searchByName(query)
-
     @GetMapping("/{id}/history")
     fun getItemHistory(@PathVariable id: String) = equipService.getItemHistory(id)
 
