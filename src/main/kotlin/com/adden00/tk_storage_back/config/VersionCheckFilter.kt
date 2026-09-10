@@ -28,6 +28,8 @@ class VersionCheckFilter(private val objectMapper: ObjectMapper) : OncePerReques
         if (version < MIN_VERSION_CODE) {
             response.status = HttpServletResponse.SC_FORBIDDEN
             response.contentType = MediaType.APPLICATION_JSON_VALUE
+            // без явной кодировки writer берёт ISO-8859-1 и кириллица уходит вопросами
+            response.characterEncoding = Charsets.UTF_8.name()
             objectMapper.writeValue(response.writer, ErrorResponse(message = "Пожалуйста обновите приложение!"))
             return
         }

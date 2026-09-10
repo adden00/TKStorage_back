@@ -15,8 +15,12 @@ class HttpClientConfig {
             .followRedirects(HttpClient.Redirect.NORMAL)
             .connectTimeout(Duration.ofSeconds(10))
             .build()
+        // без read timeout плановый импорт может повиснуть навсегда на подвисшем Apps Script
+        val requestFactory = JdkClientHttpRequestFactory(httpClient).apply {
+            setReadTimeout(Duration.ofSeconds(60))
+        }
         return RestClient.builder()
-            .requestFactory(JdkClientHttpRequestFactory(httpClient))
+            .requestFactory(requestFactory)
             .build()
     }
 }

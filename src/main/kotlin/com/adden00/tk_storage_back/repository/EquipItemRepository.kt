@@ -12,6 +12,8 @@ interface EquipItemRepository : MongoRepository<EquipItem, String>, EquipItemRep
     @Query("{ 'id': ?0 }")
     fun findByAppId(id: String): EquipItem?
 
+    fun findAllByLocationUserId(locationUserId: String): List<EquipItem>
+
     @Aggregation(pipeline = ["{ '\$group': { '_id': null, 'maxId': { '\$max': { '\$toLong': '\$id' } } } }"])
     fun findMaxNumericId(): MaxIdResult?
 }
