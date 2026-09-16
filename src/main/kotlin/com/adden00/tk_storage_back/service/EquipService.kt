@@ -41,6 +41,7 @@ class EquipService(
         /** Выгрузки до появления колонки с привязкой. */
         private const val LEGACY_COLUMN_COUNT = 11
         private const val USER_NOT_FOUND = "Пользователь не найден, обновите справочник"
+        private const val SCRIPT_OK = "\"ok\":true"
 
         /**
          * Единственное, что проставляется автоматически: служебные места.
@@ -220,14 +221,26 @@ class EquipService(
 
     fun exportToSheets(): ExportResponse {
         if (appScriptUrl.isBlank()) return ExportResponse(success = false, message = "Apps Script URL not configured")
+        // Выгрузка переписывает таблицу целиком. Пустая база затёрла бы её начисто —
+        // а пустой она бывает ровно тогда, когда что-то пошло не так.
+        if (equipItemRepository.count() == 0L) {
+            return ExportResponse(success = false, message = "В базе нет предметов, выгрузка отменена")
+        }
         return try {
-            appScriptRestClient.post()
+            val body = appScriptRestClient.post()
                 .uri(appScriptUrl)
                 .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
                 .body(buildItemsCsv(includeHeader = false))
                 .retrieve()
-                .toBodilessEntity()
-            ExportResponse(success = true)
+                .body(String::class.java)
+                .orEmpty()
+            // Apps Script отвечает {"ok":true,...}; страница авторизации или ошибка
+            // скрипта иначе прошли бы как успех — для ночной задачи это недопустимо
+            if (SCRIPT_OK !in body) {
+                ExportResponse(success = false, message = "Apps Script ответил: ${body.take(200)}")
+            } else {
+                ExportResponse(success = true)
+            }
         } catch (e: Exception) {
             ExportResponse(success = false, message = e.message)
         }

@@ -29,6 +29,14 @@ class UserService(
         private const val COLUMN_COUNT = 17
         private const val SEARCH_LIMIT = 50
         private const val MIN_QUERY_LENGTH = 2
+
+        /**
+         * Насколько справочник может усохнуть за один импорт. Apps Script под квотой
+         * или таймаутом отдаёт не ошибку, а обрезанный CSV — и без этой проверки
+         * пропавшие люди утащили бы за собой привязки, а ночная выгрузка тут же
+         * записала бы потерю в таблицу.
+         */
+        private const val MIN_KEEP_RATIO = 0.5
     }
 
     // Ручной вызов может наложиться на плановый: два deleteAll внахлёст
@@ -72,6 +80,15 @@ class UserService(
                 merged[user.id] = if (existing == null) user else merge(existing, user)
             }
             val deduped = merged.values.toList()
+
+            val existing = (clubUserRepository.count() - ClubUser.SYSTEM_USERS.size).coerceAtLeast(0)
+            if (existing > 0 && deduped.size < existing * MIN_KEEP_RATIO) {
+                return ImportResponse(
+                    success = false,
+                    message = "В выгрузке ${deduped.size} записей против $existing в справочнике — " +
+                        "похоже на обрезанный ответ. Справочник не тронут"
+                )
+            }
 
             clubUserRepository.deleteAll()
             clubUserRepository.saveAll(deduped + ClubUser.SYSTEM_USERS)
