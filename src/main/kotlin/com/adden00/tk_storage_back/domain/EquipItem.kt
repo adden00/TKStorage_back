@@ -18,7 +18,8 @@ data class EquipItem(
     val location: String = "",
     val event: String = "",
     val info: String = "",
-    val date: String = ""
+    val date: String = "",
+    val locationUserId: String = ""
 )
 
 fun EquipItemDto.toItem() = EquipItem(
@@ -32,5 +33,6 @@ fun EquipItemDto.toItem() = EquipItem(
     location = location,
     event = event,
     info = info,
-    date = date
+    date = date,
+    locationUserId = locationUserId ?: ""
 )

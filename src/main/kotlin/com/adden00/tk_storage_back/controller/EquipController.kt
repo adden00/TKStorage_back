@@ -28,6 +28,9 @@ class EquipController(private val equipService: EquipService) {
     @GetMapping("/free-id")
     fun getFreeId() = equipService.getFreeId()
 
+    @GetMapping("/unbound")
+    fun getUnboundItems() = equipService.getUnboundItems()
+
     @GetMapping("/search")
     fun search(@RequestParam query: String) = equipService.search(query)
 

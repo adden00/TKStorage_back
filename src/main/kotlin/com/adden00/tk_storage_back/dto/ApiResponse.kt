@@ -2,7 +2,11 @@ package com.adden00.tk_storage_back.dto
 
 import com.adden00.tk_storage_back.domain.HistoryEntry
 
-data class ItemResponse(val success: Boolean, val equipItem: EquipItemDto? = null)
+data class ItemResponse(
+    val success: Boolean,
+    val equipItem: EquipItemDto? = null,
+    val message: String? = null
+)
 
 data class FreeIdResponse(val success: Boolean, val id: String? = null)
 
@@ -15,3 +19,12 @@ data class ErrorResponse(val success: Boolean = false, val message: String)
 data class ExportResponse(val success: Boolean, val message: String? = null)
 
 data class ImportResponse(val success: Boolean, val importedCount: Int? = null, val message: String? = null)
+
+data class UserResponse(val success: Boolean, val user: ClubUserDto? = null)
+
+data class UserSearchResponse(
+    val success: Boolean,
+    val users: List<ClubUserShortDto>? = null,
+    val hasMore: Boolean? = null,
+    val message: String? = null
+)

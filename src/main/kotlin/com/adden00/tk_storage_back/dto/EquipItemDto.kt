@@ -11,5 +11,11 @@ data class EquipItemDto(
     val location: String = "",
     val event: String = "",
     val info: String = "",
-    val date: String = ""
+    val date: String = "",
+    /**
+     * Привязка к записи справочника. В ответах пустая строка — привязки нет.
+     * В запросе null означает "поле не прислано", пустая строка —
+     * "привязка снята"; см. EquipService.resolveLocation.
+     */
+    val locationUserId: String? = null
 )

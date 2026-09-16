@@ -9,7 +9,7 @@ import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 
-private const val MIN_VERSION_CODE = 3
+private const val MIN_VERSION_CODE = 4
 
 @Component
 class VersionCheckFilter(private val objectMapper: ObjectMapper) : OncePerRequestFilter() {
@@ -28,6 +28,8 @@ class VersionCheckFilter(private val objectMapper: ObjectMapper) : OncePerReques
         if (version < MIN_VERSION_CODE) {
             response.status = HttpServletResponse.SC_FORBIDDEN
             response.contentType = MediaType.APPLICATION_JSON_VALUE
+            // без явной кодировки writer берёт ISO-8859-1 и кириллица уходит вопросами
+            response.characterEncoding = Charsets.UTF_8.name()
             objectMapper.writeValue(response.writer, ErrorResponse(message = "Пожалуйста обновите приложение!"))
             return
         }
