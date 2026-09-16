@@ -9,7 +9,7 @@ import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 
-private const val MIN_VERSION_CODE = 3
+private const val MIN_VERSION_CODE = 4
 
 @Component
 class VersionCheckFilter(private val objectMapper: ObjectMapper) : OncePerRequestFilter() {
