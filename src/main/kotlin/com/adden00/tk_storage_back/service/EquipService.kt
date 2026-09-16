@@ -1,5 +1,6 @@
 package com.adden00.tk_storage_back.service
 
+import com.adden00.tk_storage_back.domain.ClubUser
 import com.adden00.tk_storage_back.domain.EquipItem
 import com.adden00.tk_storage_back.domain.HistoryEntry
 import com.adden00.tk_storage_back.domain.toItem
@@ -19,8 +20,8 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
-/** Итог перепривязки: сколько предметов нашли хозяина и сколько потеряли протухшую ссылку. */
-data class RebindResult(val bound: Int = 0, val cleared: Int = 0, val renamed: Int = 0)
+/** Итог сверки со справочником: снятые протухшие ссылки и поправленный текст. */
+data class DirectoryCheckResult(val cleared: Int = 0, val renamed: Int = 0)
 
 @Service
 class EquipService(
@@ -33,9 +34,24 @@ class EquipService(
 ) {
 
     companion object {
-        private const val HEADER = "id,category,brand,name,color,weigh,quality,location,event,info,date"
-        private const val COLUMN_COUNT = 11
+        private const val HEADER =
+            "id,category,brand,name,color,weigh,quality,location,event,info,date,locationUserId"
+        private const val COLUMN_COUNT = 12
+
+        /** Выгрузки до появления колонки с привязкой. */
+        private const val LEGACY_COLUMN_COUNT = 11
         private const val USER_NOT_FOUND = "Пользователь не найден, обновите справочник"
+
+        /**
+         * Единственное, что проставляется автоматически: служебные места.
+         * Это не догадка — соответствие задано явно, людей оно не касается.
+         * Ключи уже нормализованы (нижний регистр, схлопнутые пробелы).
+         */
+        private val SYSTEM_PLACES = mapOf(
+            "склад" to ClubUser.ID_WAREHOUSE,
+            "новый склад" to ClubUser.ID_UNKNOWN,
+            "неизвестно" to ClubUser.ID_UNKNOWN
+        )
     }
 
     fun getItem(id: String): ItemResponse {
@@ -124,64 +140,40 @@ class EquipService(
     }
 
     /**
-     * Переразрешает привязки по свежему справочнику. Вызывается после его синхронизации:
-     * это единственный момент, когда текст, раньше ни с кем не совпадавший, может совпасть,
-     * а привязка на исправленное ФИО — наоборот, протухнуть.
+     * Сверяет привязки со свежим справочником. Ничего не угадывает: новые совпадения
+     * по тексту сознательно не ищутся — привязку ставит только человек через приложение.
      *
-     * Трогает только проблемные предметы: без привязки и с привязкой на исчезнувшую запись.
-     * Здоровые не пересматриваются, иначе правка справочника молча переносила бы вещи.
+     * Делает ровно две вещи: снимает ссылки на записи, которых больше нет (обычно
+     * ФИО поправили в таблице и у человека сменился id), и держит текст привязанных
+     * предметов равным каноническому ФИО.
      */
-    fun rebindByDirectory(): RebindResult {
+    fun checkAgainstDirectory(): DirectoryCheckResult {
         val allUsers = clubUserRepository.findAll()
-        if (allUsers.isEmpty()) return RebindResult()
+        if (allUsers.isEmpty()) return DirectoryCheckResult()
         val usersById = allUsers.associateBy { it.id }
-        val usersByName = allUsers.groupBy { Normalize.text(it.fullName) }
-        val nameWordsCache = allUsers.associate { it.id to LocationMatcher.nameWords(it) }
-        val matchCache = HashMap<String, String?>()
 
-        var bound = 0
         var cleared = 0
         var renamed = 0
         val changed = mutableListOf<EquipItem>()
 
         for (item in equipItemRepository.findAll()) {
-            val boundUser = usersById[item.locationUserId]
-            if (boundUser != null) {
-                // привязка жива: следим только за тем, чтобы текст оставался каноническим ФИО
-                if (item.location != boundUser.fullName) {
-                    changed.add(item.copy(location = boundUser.fullName))
+            if (item.locationUserId.isBlank()) continue
+            val user = usersById[item.locationUserId]
+            when {
+                user == null -> {
+                    // текст ФИО остаётся, чтобы было видно, кого перепривязать руками
+                    changed.add(item.copy(locationUserId = ""))
+                    cleared++
+                }
+                item.location != user.fullName -> {
+                    changed.add(item.copy(location = user.fullName))
                     renamed++
                 }
-                continue
-            }
-            val dangling = item.locationUserId.isNotBlank()
-            if (item.location.isBlank()) {
-                if (dangling) { changed.add(item.copy(locationUserId = "")); cleared++ }
-                continue
-            }
-
-            val key = Normalize.text(item.location)
-            val matched = if (matchCache.containsKey(key)) {
-                matchCache[key]
-            } else {
-                LocationMatcher.match(item.location, usersByName, allUsers, nameWordsCache)
-                    .also { matchCache[key] = it }
-            }
-
-            when {
-                matched != null -> {
-                    val user = usersById.getValue(matched)
-                    if (item.locationUserId != matched || item.location != user.fullName) {
-                        changed.add(item.copy(location = user.fullName, locationUserId = matched))
-                        bound++
-                    }
-                }
-                dangling -> { changed.add(item.copy(locationUserId = "")); cleared++ }
             }
         }
 
         if (changed.isNotEmpty()) equipItemRepository.saveAll(changed)
-        return RebindResult(bound = bound, cleared = cleared, renamed = renamed)
+        return DirectoryCheckResult(cleared = cleared, renamed = renamed)
     }
 
     /** Предметы, местоположение которых осталось свободным текстом. */
@@ -262,50 +254,49 @@ class EquipService(
 
             val rows = Csv.parse(csv).filter { it.isNotEmpty() && it.any { c -> c.isNotBlank() } }
             if (rows.isEmpty()) return ImportResponse(success = false, message = "CSV has no data rows")
-            if (rows.any { it.size != COLUMN_COUNT })
+            val width = rows.first().size
+            if (width != COLUMN_COUNT && width != LEGACY_COLUMN_COUNT)
+                return ImportResponse(success = false, message = "Malformed CSV: wrong column count")
+            if (rows.any { it.size != width })
                 return ImportResponse(success = false, message = "Malformed CSV: wrong column count")
 
-            // CSV снаряжения не содержит привязок, поэтому deleteAll их бы уничтожил.
-            // Снимаем их заранее и возвращаем тем предметам, у которых текст не поменяли.
-            val bindings = equipItemRepository.findAll()
-                .filter { it.locationUserId.isNotBlank() }
-                .associate { it.id to (it.location.trim() to it.locationUserId) }
+            // В выгрузке без колонки привязок опереться можно только на то, что уже в базе:
+            // привязка держится, пока текст местоположения в таблице не трогали.
+            val previous = if (width == LEGACY_COLUMN_COUNT) {
+                equipItemRepository.findAll()
+                    .filter { it.locationUserId.isNotBlank() }
+                    .associate { it.id to (Normalize.text(it.location) to it.locationUserId) }
+            } else {
+                emptyMap()
+            }
 
-            val allUsers = clubUserRepository.findAll()
-            val usersByName = allUsers.groupBy { Normalize.text(it.fullName) }
-            val usersById = allUsers.associateBy { it.id }
-            val nameWordsCache = allUsers.associate { it.id to LocationMatcher.nameWords(it) }
-            val matchCache = HashMap<String, String?>()
+            val usersById = clubUserRepository.findAll().associateBy { it.id }
 
-            var restored = 0
-            var healed = 0
+            var bound = 0
+            var places = 0
+            var dropped = 0
             val items = rows.map { r ->
-                val csvLocation = r[7].trim()
-                var boundUserId = bindings[r[0]]
-                    ?.takeIf { Normalize.text(it.first) == Normalize.text(csvLocation) }
+                val fromSheet = if (width == COLUMN_COUNT) r[11].trim() else ""
+                val restored = previous[r[0]]
+                    ?.takeIf { it.first == Normalize.text(r[7]) }
                     ?.second
-                    ?.also { restored++ }
-                    ?: ""
-                // текст в таблице пишут как придётся — пробуем узнать в нём человека
-                if (boundUserId.isEmpty() && csvLocation.isNotEmpty()) {
-                    val key = Normalize.text(csvLocation)
-                    val matched = if (matchCache.containsKey(key)) {
-                        matchCache[key]
-                    } else {
-                        LocationMatcher.match(csvLocation, usersByName, allUsers, nameWordsCache)
-                            .also { matchCache[key] = it }
-                    }
-                    if (matched != null) {
-                        boundUserId = matched
-                        healed++
-                    }
+                    .orEmpty()
+                val place = SYSTEM_PLACES[Normalize.text(r[7])].orEmpty()
+                val candidate = fromSheet.ifBlank { restored }.ifBlank { place }
+                val locationUserId = when {
+                    candidate.isBlank() -> ""
+                    !usersById.containsKey(candidate) -> "".also { dropped++ }
+                    else -> candidate.also { if (candidate == place && fromSheet.isBlank() && restored.isBlank()) places++ else bound++ }
                 }
-                // привязали — значит текст приводим к ФИО из справочника,
-                // иначе местоположение и ссылка разъедутся
-                val location = usersById[boundUserId]?.fullName ?: r[7]
+                // у служебных мест текст приводим к каноническому: "новый склад" -> "Неизвестно"
+                val location = if (locationUserId.isNotBlank() && locationUserId == place) {
+                    usersById.getValue(locationUserId).fullName
+                } else {
+                    r[7]
+                }
                 EquipItem(id = r[0], category = r[1], brand = r[2], name = r[3], color = r[4],
                     weigh = r[5], quality = r[6], location = location, event = r[8], info = r[9], date = r[10],
-                    locationUserId = boundUserId)
+                    locationUserId = locationUserId)
             }
             val dupId = items.groupingBy { it.id }.eachCount().entries.firstOrNull { it.value > 1 }?.key
             if (dupId != null) return ImportResponse(success = false, message = "Duplicate id in CSV: $dupId")
@@ -315,7 +306,7 @@ class EquipService(
             ImportResponse(
                 success = true,
                 importedCount = items.size,
-                message = "восстановлено привязок: $restored, распознано по ФИО: $healed"
+                message = "привязок: $bound, служебных мест: $places, отброшено неизвестных: $dropped"
             )
         } catch (e: Exception) {
             ImportResponse(success = false, message = e.message)
@@ -323,7 +314,10 @@ class EquipService(
     }
 
     fun buildItemsXlsx(): ByteArray {
-        val header = listOf("id", "category", "brand", "name", "color", "weigh", "quality", "location", "event", "info", "date")
+        val header = listOf(
+            "id", "category", "brand", "name", "color", "weigh", "quality",
+            "location", "event", "info", "date", "locationUserId"
+        )
         XSSFWorkbook().use { workbook ->
             val sheet = workbook.createSheet("Items")
             sheet.createRow(0).let { row ->
@@ -342,7 +336,8 @@ class EquipService(
 
     private fun itemValues(item: EquipItem) = listOf(
         item.id, item.category, item.brand, item.name, item.color,
-        item.weigh, item.quality, item.location, item.event, item.info, item.date
+        item.weigh, item.quality, item.location, item.event, item.info, item.date,
+        item.locationUserId
     )
 
     private fun buildDto(item: EquipItem) = EquipItemDto(

@@ -76,16 +76,15 @@ class UserService(
             clubUserRepository.deleteAll()
             clubUserRepository.saveAll(deduped + ClubUser.SYSTEM_USERS)
 
-            // справочник изменился — значит могли появиться совпадения для предметов,
-            // записанных свободным текстом, и протухнуть привязки на исправленные ФИО
-            val rebind = equipService.rebindByDirectory()
+            // справочник изменился — привязки могли протухнуть. Новые совпадения
+            // не ищем: привязку ставит только человек через приложение.
+            val check = equipService.checkAgainstDirectory()
 
             ImportResponse(
                 success = true,
                 importedCount = deduped.size + ClubUser.SYSTEM_USERS.size,
                 message = "пропущено строк: $skipped, схлопнуто дублей: ${parsed.size - deduped.size}, " +
-                    "привязано предметов: ${rebind.bound}, снято протухших: ${rebind.cleared}, " +
-                    "поправлен текст: ${rebind.renamed}"
+                    "снято протухших привязок: ${check.cleared}, поправлен текст: ${check.renamed}"
             )
         } catch (e: Exception) {
             ImportResponse(success = false, message = e.message)
