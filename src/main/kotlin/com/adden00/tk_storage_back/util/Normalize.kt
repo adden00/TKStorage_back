@@ -10,6 +10,12 @@ object Normalize {
 
     private val OUT = DateTimeFormatter.ofPattern("dd.MM.yyyy")
 
+    /**
+     * Настоящая дата в ячейке таблицы приезжает в ISO — иногда со временем.
+     * Это тот же день, что и "24.01.2004" текстом, и разойтись в ключе они не должны.
+     */
+    private val ISO_DATE = Regex("(\\d{4})-(\\d{1,2})-(\\d{1,2})(?:[t ].*)?")
+
     private val BIRTH_PATTERNS = listOf(
         DateTimeFormatter.ofPattern("dd.MM.yyyy"),
         DateTimeFormatter.ofPattern("d.M.yyyy"),
@@ -42,6 +48,9 @@ object Normalize {
     fun birthDate(raw: String): String {
         val compact = text(raw).replace(" ", "")
         if (compact.isEmpty() || compact == "-" || compact == "—") return ""
+        ISO_DATE.matchEntire(text(raw))?.destructured?.let { (year, month, day) ->
+            runCatching { return LocalDate.of(year.toInt(), month.toInt(), day.toInt()).format(OUT) }
+        }
         for (pattern in BIRTH_PATTERNS) {
             runCatching { return LocalDate.parse(compact, pattern).format(OUT) }
         }
