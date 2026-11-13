@@ -10,6 +10,6 @@ class WebConfig : WebMvcConfigurer {
         registry.addMapping("/**")
             .allowedOriginPatterns("*")
             .allowedMethods("GET", "POST", "PUT")
-            .allowedHeaders("Content-Type", "X-App-Version-Code")
+            .allowedHeaders("Content-Type", "X-App-Version-Code", "Authorization")
     }
 }

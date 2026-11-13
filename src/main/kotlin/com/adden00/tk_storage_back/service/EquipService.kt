@@ -66,7 +66,7 @@ class EquipService(
         return ItemResponse(success = true, equipItem = buildDto(item))
     }
 
-    fun updateItem(id: String, body: UpdateItemRequest): ItemResponse {
+    fun updateItem(id: String, body: UpdateItemRequest, keyholderName: String): ItemResponse {
         val item = equipItemRepository.findByAppId(id) ?: return ItemResponse(success = false)
         val newItem = resolveLocation(body.newItem, item)
             ?: return ItemResponse(success = false, message = USER_NOT_FOUND)
@@ -85,7 +85,7 @@ class EquipService(
                 event = sumIfDifferent(item.event, newItem.event),
                 info = sumIfDifferent(item.info, newItem.info),
                 timestamp = getCurrentTime(),
-                keyholderName = body.keyholderName,
+                keyholderName = keyholderName,
                 userIds = movedBetween(item.locationUserId, newItem.locationUserId ?: "")
             )
         )
@@ -108,7 +108,7 @@ class EquipService(
         return ItemResponse(success = true, equipItem = buildDto(updated))
     }
 
-    fun addItem(body: AddItemRequest): ItemResponse {
+    fun addItem(body: AddItemRequest, keyholderName: String): ItemResponse {
         val newItem = resolveLocation(body.newItem, null)
             ?: return ItemResponse(success = false, message = USER_NOT_FOUND)
         return try {
@@ -127,7 +127,7 @@ class EquipService(
                     event = newItem.event,
                     info = newItem.info,
                     timestamp = getCurrentTime(),
-                    keyholderName = body.keyholderName,
+                    keyholderName = keyholderName,
                     userIds = movedBetween("", newItem.locationUserId ?: "")
                 )
             )
