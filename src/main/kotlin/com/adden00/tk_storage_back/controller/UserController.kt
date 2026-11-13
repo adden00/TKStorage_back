@@ -25,6 +25,13 @@ class UserController(
     @GetMapping("/{id}/items")
     fun getUserItems(@PathVariable id: String) = equipService.getItemsOfUser(id)
 
+    @GetMapping("/{id}/history")
+    fun getUserHistory(
+        @PathVariable id: String,
+        @RequestParam(required = false) before: String?,
+        @RequestParam(defaultValue = "30") size: Int
+    ) = equipService.getUserHistoryPage(id, before, size)
+
     @PostMapping("/import/sheets")
     fun importFromSheets() = userService.importFromSheets()
 }

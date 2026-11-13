@@ -1,9 +1,11 @@
 package com.adden00.tk_storage_back.domain
 
 import org.springframework.data.annotation.Id
+import org.springframework.data.mongodb.core.index.CompoundIndex
 import org.springframework.data.mongodb.core.mapping.Document
 
 @Document(collection = "history")
+@CompoundIndex(name = "user_history", def = "{'userIds': 1, '_id': -1}")
 data class HistoryEntry(
     @Id val mongoId: String? = null,
     val action: String,
@@ -18,5 +20,6 @@ data class HistoryEntry(
     val event: String,
     val info: String,
     val timestamp: String,
-    val keyholderName: String
+    val keyholderName: String,
+    val userIds: List<String> = emptyList()
 )

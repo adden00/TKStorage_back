@@ -14,6 +14,13 @@ data class SearchResponse(val success: Boolean, val items: List<EquipItemDto>? =
 
 data class HistoryResponse(val success: Boolean, val entries: List<HistoryEntry>? = null)
 
+data class HistoryPageResponse(
+    val success: Boolean,
+    val entries: List<HistoryEntry>? = null,
+    val hasMore: Boolean? = null,
+    val message: String? = null
+)
+
 data class ErrorResponse(val success: Boolean = false, val message: String)
 
 data class ExportResponse(val success: Boolean, val message: String? = null)
