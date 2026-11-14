@@ -44,8 +44,11 @@ class AuthFilter(
     companion object {
         const val KEYHOLDER_NAME = "keyholderName"
 
+        // Web builds <= 2.2.0 send logout with two tokens merged into one header: "Bearer <old>, Bearer <new>".
+        // The first one is the session being ended, so take only the first comma-separated value.
         fun bearerToken(request: HttpServletRequest): String? =
             request.getHeader(HttpHeaders.AUTHORIZATION)
+                ?.substringBefore(',')?.trim()
                 ?.takeIf { it.startsWith("Bearer ", ignoreCase = true) }
                 ?.substring(7)?.trim()
                 ?.takeIf { it.isNotEmpty() }
