@@ -1,5 +1,6 @@
 package com.adden00.tk_storage_back.controller
 
+import com.adden00.tk_storage_back.config.AuthFilter
 import com.adden00.tk_storage_back.dto.AddItemRequest
 import com.adden00.tk_storage_back.dto.UpdateItemRequest
 import com.adden00.tk_storage_back.service.EquipService
@@ -19,11 +20,17 @@ class EquipController(private val equipService: EquipService) {
     fun getItem(@PathVariable id: String) = equipService.getItem(id)
 
     @PostMapping("/add")
-    fun addItem(@RequestBody body: AddItemRequest) = equipService.addItem(body)
+    fun addItem(
+        @RequestBody body: AddItemRequest,
+        @RequestAttribute(AuthFilter.KEYHOLDER_NAME) keyholderName: String,
+    ) = equipService.addItem(body, keyholderName)
 
     @PutMapping("/update/{id}")
-    fun updateItem(@PathVariable id: String, @RequestBody body: UpdateItemRequest) =
-        equipService.updateItem(id, body)
+    fun updateItem(
+        @PathVariable id: String,
+        @RequestBody body: UpdateItemRequest,
+        @RequestAttribute(AuthFilter.KEYHOLDER_NAME) keyholderName: String,
+    ) = equipService.updateItem(id, body, keyholderName)
 
     @GetMapping("/free-id")
     fun getFreeId() = equipService.getFreeId()

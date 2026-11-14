@@ -11,7 +11,12 @@ import com.adden00.tk_storage_back.repository.HistoryEntryRepository
 import com.adden00.tk_storage_back.util.Csv
 import com.adden00.tk_storage_back.util.Normalize
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
+import org.bson.types.ObjectId
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
+import org.springframework.data.domain.Sort
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Service
 import org.springframework.web.client.RestClient
@@ -41,6 +46,7 @@ class EquipService(
         /** Выгрузки до появления колонки с привязкой. */
         private const val LEGACY_COLUMN_COUNT = 11
         private const val USER_NOT_FOUND = "Пользователь не найден, обновите справочник"
+        private const val MAX_HISTORY_PAGE = 100
         private const val SCRIPT_OK = "\"ok\":true"
 
         /**
@@ -60,7 +66,7 @@ class EquipService(
         return ItemResponse(success = true, equipItem = buildDto(item))
     }
 
-    fun updateItem(id: String, body: UpdateItemRequest): ItemResponse {
+    fun updateItem(id: String, body: UpdateItemRequest, keyholderName: String): ItemResponse {
         val item = equipItemRepository.findByAppId(id) ?: return ItemResponse(success = false)
         val newItem = resolveLocation(body.newItem, item)
             ?: return ItemResponse(success = false, message = USER_NOT_FOUND)
@@ -79,7 +85,8 @@ class EquipService(
                 event = sumIfDifferent(item.event, newItem.event),
                 info = sumIfDifferent(item.info, newItem.info),
                 timestamp = getCurrentTime(),
-                keyholderName = body.keyholderName
+                keyholderName = keyholderName,
+                userIds = movedBetween(item.locationUserId, newItem.locationUserId ?: "")
             )
         )
 
@@ -101,7 +108,7 @@ class EquipService(
         return ItemResponse(success = true, equipItem = buildDto(updated))
     }
 
-    fun addItem(body: AddItemRequest): ItemResponse {
+    fun addItem(body: AddItemRequest, keyholderName: String): ItemResponse {
         val newItem = resolveLocation(body.newItem, null)
             ?: return ItemResponse(success = false, message = USER_NOT_FOUND)
         return try {
@@ -120,7 +127,8 @@ class EquipService(
                     event = newItem.event,
                     info = newItem.info,
                     timestamp = getCurrentTime(),
-                    keyholderName = body.keyholderName
+                    keyholderName = keyholderName,
+                    userIds = movedBetween("", newItem.locationUserId ?: "")
                 )
             )
             ItemResponse(success = true, equipItem = newItem)
@@ -217,6 +225,31 @@ class EquipService(
             )
         }
         return HistoryResponse(success = true, entries = entries)
+    }
+
+    fun getHistoryPage(before: String?, size: Int): HistoryPageResponse =
+        historyPage(before, size,
+            first = { historyEntryRepository.findAllBy(it) },
+            next = { cursor, p -> historyEntryRepository.findAllByMongoIdLessThan(cursor, p) })
+
+    fun getUserHistoryPage(userId: String, before: String?, size: Int): HistoryPageResponse =
+        historyPage(before, size,
+            first = { historyEntryRepository.findAllByUserIds(userId, it) },
+            next = { cursor, p -> historyEntryRepository.findAllByUserIdsAndMongoIdLessThan(userId, cursor, p) })
+
+    private fun historyPage(
+        before: String?,
+        size: Int,
+        first: (Pageable) -> Slice<HistoryEntry>,
+        next: (String, Pageable) -> Slice<HistoryEntry>
+    ): HistoryPageResponse {
+        val pageable = PageRequest.of(0, size.coerceIn(1, MAX_HISTORY_PAGE), Sort.by(Sort.Direction.DESC, "mongoId"))
+        val slice = when {
+            before.isNullOrBlank() -> first(pageable)
+            ObjectId.isValid(before) -> next(before, pageable)
+            else -> return HistoryPageResponse(success = false, message = "Некорректный курсор истории")
+        }
+        return HistoryPageResponse(success = true, entries = slice.content, hasMore = slice.hasNext())
     }
 
     fun exportToSheets(): ExportResponse {
@@ -398,6 +431,10 @@ class EquipService(
             }
         }
     }
+
+    private fun movedBetween(fromUserId: String, toUserId: String): List<String> =
+        if (fromUserId == toUserId) emptyList()
+        else listOf(fromUserId, toUserId).filter { it.isNotBlank() }
 
     private fun sumIfDifferent(old: String, new: String) =
         if (old == new) old else "$old-->$new"

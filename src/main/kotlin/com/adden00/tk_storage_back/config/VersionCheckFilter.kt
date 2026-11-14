@@ -5,18 +5,18 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.springframework.core.annotation.Order
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 
-private const val MIN_VERSION_CODE = 4
+private const val MIN_VERSION_CODE = 5
 
 @Component
+@Order(1)
 class VersionCheckFilter(private val objectMapper: ObjectMapper) : OncePerRequestFilter() {
     override fun shouldNotFilter(request: HttpServletRequest) =
         request.requestURI == "/health" ||
-        request.requestURI == "/items/export" ||
-        request.requestURI == "/items/export/csv" ||
         request.method == "OPTIONS"
 
     override fun doFilterInternal(
